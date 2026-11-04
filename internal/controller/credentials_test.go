@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"errors"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -84,5 +85,70 @@ var _ = Describe("createLinodeClient", func() {
 	It("returns an error when the Secret does not exist", func() {
 		r := reconcilerWith()
 		Expect(r.createLinodeClient(context.Background(), opts)).To(MatchError(ContainSubstring("not found")))
+	})
+
+	Context("when the API server does not answer", func() {
+		type getCall struct {
+			deadline    time.Time
+			hasDeadline bool
+		}
+
+		// The APIReader records the deadline of the context it receives and then blocks
+		// until that context is done, like a GET to an API server that never answers.
+		blockingReconciler := func(calls chan<- getCall) *CloudFirewallReconciler {
+			return &CloudFirewallReconciler{
+				Client: cachedClient(),
+				APIReader: fake.NewClientBuilder().WithScheme(scheme.Scheme).WithInterceptorFuncs(interceptor.Funcs{
+					Get: func(ctx context.Context, _ client.WithWatch, _ client.ObjectKey, _ client.Object, _ ...client.GetOption) error {
+						deadline, ok := ctx.Deadline()
+						calls <- getCall{deadline: deadline, hasDeadline: ok}
+						<-ctx.Done()
+						return ctx.Err()
+					},
+				}).Build(),
+				Scheme: scheme.Scheme,
+			}
+		}
+
+		// Run createLinodeClient in a goroutine, so that a regression fails the spec
+		// instead of hanging the suite.
+		callAsync := func(ctx context.Context, r *CloudFirewallReconciler) <-chan error {
+			result := make(chan error, 1)
+			go func() {
+				defer GinkgoRecover()
+				result <- r.createLinodeClient(ctx, opts)
+			}()
+			return result
+		}
+
+		It("reads the Secret with a context that has a deadline of about 30s", func() {
+			calls := make(chan getCall, 1)
+			// The caller's context has no deadline, so any deadline comes from createLinodeClient.
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+
+			start := time.Now()
+			result := callAsync(ctx, blockingReconciler(calls))
+
+			var call getCall
+			Eventually(calls).WithTimeout(5 * time.Second).Should(Receive(&call))
+			Expect(call.hasDeadline).To(BeTrue(), "the credentials read must have a deadline")
+			Expect(call.deadline).To(BeTemporally("~", start.Add(30*time.Second), time.Second), "the credentials read must time out after about 30s")
+
+			cancel()
+			Eventually(result).WithTimeout(5 * time.Second).Should(Receive(HaveOccurred()))
+		})
+
+		It("returns an error when the caller's context ends", func() {
+			calls := make(chan getCall, 1)
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			result := callAsync(ctx, blockingReconciler(calls))
+
+			var err error
+			Eventually(result).WithTimeout(5 * time.Second).Should(Receive(&err))
+			Expect(err).To(MatchError(ContainSubstring(context.DeadlineExceeded.Error())))
+		})
 	})
 })
