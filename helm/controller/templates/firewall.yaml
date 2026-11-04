@@ -6,7 +6,9 @@ metadata:
   namespace: kube-system
 spec:
   # defaultRules is true by default; leave empty to use defaults only
-  # defaultRules: true
+  {{- if hasKey .Values.firewall "defaultRules" }}
+  defaultRules: {{ .Values.firewall.defaultRules }}
+  {{- end }}
   ruleset:
     # Policies default to DROP/ACCEPT; override if desired
     # inbound_policy:  "DROP"
