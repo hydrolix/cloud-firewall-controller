@@ -12,19 +12,16 @@ spec:
   {{- if hasKey .Values.firewall "defaultRules" }}
   defaultRules: {{ .Values.firewall.defaultRules }}
   {{- end }}
-  ruleset:
+  # Empty rule lists are left out rather than rendered as [], because the controller
+  # drops them when it updates the object and ArgoCD would then report a difference.
+  ruleset:{{ if not (or .Values.firewall.inbound .Values.firewall.outbound) }} {}{{ end }}
     # Policies default to DROP/ACCEPT; override if desired
     # inbound_policy:  "DROP"
     # outbound_policy: "ACCEPT"
-    {{- if and (hasKey .Values.firewall "outbound") (gt (len .Values.firewall.outbound) 0) }}
-    outbound: {{ toYaml .Values.firewall.outbound | nindent 6 }}
-    {{- else }}
-    outbound: []
+    {{- with .Values.firewall.outbound }}
+    outbound: {{ toYaml . | nindent 6 }}
     {{- end }}
-    inbound:
-      {{- if .Values.firewall.inbound }}
-      {{ toYaml .Values.firewall.inbound | nindent 6 }}
-      {{- else }}
-      []
-      {{- end }}
+    {{- with .Values.firewall.inbound }}
+    inbound: {{ toYaml . | nindent 6 }}
+    {{- end }}
 {{- end }}
