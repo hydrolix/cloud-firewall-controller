@@ -99,7 +99,10 @@ appended after the defaults. Existing CRs that matched a known previous default 
 automatically by the controller.
 
 If custom rules have been applied via the `firewall` block in the values file, these will be applied by the controller
-in addition to the defaults.
+in addition to the defaults, unless `firewall.defaultRules` is set to `false`. With `firewall.defaultRules: false`, the
+chart sets `spec.defaultRules: false` and the controller applies only the rules listed in the `firewall` block. The
+firewall's inbound policy is DROP, so that list must then include every rule the nodes need, including the ones the
+defaults would have provided.
 
 ```yaml
 # Additional Cloud Firewall rules can be added to the default set by adding them to the list below.

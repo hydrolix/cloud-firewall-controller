@@ -41,6 +41,10 @@ readinessProbe:
 # These will be applied along with the default ruleset. Any rule added here will below
 # applied to all nodes in the cluster.
 firewall: {}
+# Set defaultRules to false to apply only the rules listed here, without the built-in defaults.
+# The inbound policy is DROP, so the list must then include every rule the nodes need.
+# Leave it unset to keep the CRD default (true).
+#  defaultRules: false
 # Example custom inbound rule.
 #  inbound: 
 #    - label:       "allow-custom-port"
