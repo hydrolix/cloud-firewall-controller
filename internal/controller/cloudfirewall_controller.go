@@ -744,8 +744,14 @@ func (r *CloudFirewallReconciler) SetupWithManager(mgr ctrl.Manager, opts intern
 				))).Complete(r)
 }
 
+// credentialsReadTimeout bounds the GET of the Linode API token Secret. The
+// client has no request timeout by default and reconciles run one at a time,
+// so a GET that never returns would stop every CloudFirewall reconcile. 30s is
+// far above the normal latency of one small GET.
+const credentialsReadTimeout = 30 * time.Second
+
 func (r *CloudFirewallReconciler) createLinodeClient(ctx context.Context, opts internal.LinodeApiOptions) (err error) {
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, credentialsReadTimeout)
 	defer cancel()
 	creds := &corev1.Secret{}
 	err = r.APIReader.Get(ctx, client.ObjectKey{
