@@ -4,6 +4,9 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.1
+    # ArgoCD applies this CRD in an earlier wave than CloudFirewall objects and
+    # waits until it is Established. Other tools ignore the annotation.
+    argocd.argoproj.io/sync-wave: "-1"
   name: cloudfirewalls.networking.linode.com
 spec:
   group: networking.linode.com
