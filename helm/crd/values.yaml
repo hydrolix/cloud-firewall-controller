@@ -1,0 +1,5 @@
+# Default values for cloud-firewall-crd.
+crds:
+  # Additional annotations to add to the CustomResourceDefinition,
+  # for example a deploy tool's ordering annotation.
+  annotations: {}
